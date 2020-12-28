@@ -61,6 +61,14 @@ public class App {
                 .onErrorReturn(-1) // error handling example
                 .subscribe(x -> System.out.println("> " + x.toString()));
 
+        System.out.println("-----");
+
+        Flux.just(12, 44, 11, 0, 66, 22)
+                .map(i -> 100 / i)
+                .doOnError(t -> System.out.println("error: " + t.getMessage()))
+                .onErrorReturn(-1) // error handling example
+                .subscribe(x -> System.out.println("> " + x.toString()));
+
     }
 
     private static Flux<Integer> call(Integer i) {
