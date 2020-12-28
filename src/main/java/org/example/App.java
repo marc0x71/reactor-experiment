@@ -110,21 +110,35 @@ public class App {
                 () -> System.out.println("Mono consumed.")
         );
 
-        FluxEmitter fluxEmitter = new FluxEmitter();
-        fluxEmitter.attach().subscribe(
-                System.out::println,
-                error -> System.err.println("error: " + error),
-                () -> System.out.println("fluxEmitter consumed.")
-        );
+        System.out.println("----- flux emitter");
+        FluxEmitter<Integer> fluxEmitter = new FluxEmitter<>();
 
-        fluxEmitter.send(111);
-        fluxEmitter.send(112);
-        fluxEmitter.send(113);
-        fluxEmitter.send(114);
-        fluxEmitter.done();
-        fluxEmitter.send(115);
+        fluxEmitter.attach()
+                .doOnError(e -> System.out.println("error1:" + e.getMessage()))
+                .onErrorResume(Exception.class, __ -> Flux.empty())
+                .doOnNext(i -> System.out.println("1. " + i))
+                .doOnComplete(() -> System.out.println("1. completed"))
+                .subscribe();
+
+        fluxEmitter.attach()
+                //.filter(x -> x % 2 == 0)
+                .doOnError(e -> System.out.println("error2a:" + e.getMessage()))
+                .onErrorResume(Exception.class, __ -> Flux.empty())
+                .subscribe(
+                        i -> System.out.println("2. " + i),
+                        error -> System.out.println("error2b: " + error.getMessage()),
+                        () -> System.out.println("2. completed"));
+
+        fluxEmitter.next(111);
+        fluxEmitter.next(112);
+        fluxEmitter.next(113);
+        fluxEmitter.error(new Exception("This is an error"));
+        fluxEmitter.next(114);
+        fluxEmitter.next(115);
+        fluxEmitter.complete();
 
         Thread.sleep(1500);
+        System.out.println("The End");
     }
 
     private static Integer showNumberAdReturn(String scenario, Integer v) {

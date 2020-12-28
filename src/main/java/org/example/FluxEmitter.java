@@ -2,37 +2,85 @@ package org.example;
 
 import reactor.core.publisher.Flux;
 
-public class FluxEmitter {
-    private EmitterListener listener;
+import java.util.ArrayList;
+import java.util.List;
 
-    public Flux<Integer> attach() {
-        return Flux.create(emitter -> {
-            FluxEmitter.this.listener = new EmitterListener() {
+public class FluxEmitter<T> {
+    private final List<EmitterListener<T>> listeners = new ArrayList<>();
+    private final Flux<T> flux;
+
+    public FluxEmitter() {
+        this.flux = Flux.create(emitter -> {
+            EmitterListener<T> listener = FluxEmitter.this.attachListemer(new EmitterListener<T>() {
                 @Override
-                public void emit(Integer value) {
+                public void next(T value) {
                     emitter.next(value);
                 }
 
                 @Override
-                public void completed() {
+                public void error(Throwable t) {
+                    emitter.error(t);
+                }
+
+                @Override
+                public void complete() {
                     emitter.complete();
                 }
-            };
-            emitter.onDispose(() -> FluxEmitter.this.listener = null);
+            });
+            emitter.onDispose(() -> FluxEmitter.this.detachListener(listener));
         });
     }
 
-    public void send(Integer value) {
-        if (listener != null) listener.emit(value);
+    private void detachListener(EmitterListener<T> listener) {
+        synchronized (listeners) {
+            listeners.remove(listener);
+        }
     }
 
-    public void done() {
-        if (listener != null) listener.completed();
+    private EmitterListener<T> attachListemer(EmitterListener<T> listener) {
+        synchronized (listeners) {
+            listeners.add(listener);
+        }
+        return listener;
     }
 
-    private interface EmitterListener {
-        void emit(Integer value);
+    public Flux<T> attach() {
+        return flux;
+    }
 
-        void completed();
+    public void next(T value) {
+        synchronized (listeners) {
+            for (EmitterListener<T> listener : listeners) {
+                listener.next(value);
+            }
+        }
+    }
+
+    public void error(Throwable t) {
+        synchronized (listeners) {
+            for (int i = 0; i < listeners.size(); i++) {
+                EmitterListener<T> listener = listeners.get(0);
+                listener.error(t);
+                i = 0;
+            }
+        }
+    }
+
+    public void complete() {
+        synchronized (listeners) {
+            for (int i = 0; i < listeners.size(); i++) {
+                EmitterListener<T> listener = listeners.get(0);
+                listener.complete();
+                i = 0;
+            }
+        }
+    }
+
+    private interface EmitterListener<T> {
+        void next(T value);
+
+        void error(Throwable t);
+
+        void complete();
     }
 }
