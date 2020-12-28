@@ -1,4 +1,4 @@
 # reactor-experiment
 My experiments using Reactor
 
-[Project Reactor](https://projectreactor.io/)
+See [Project Reactor](https://projectreactor.io/) for details
