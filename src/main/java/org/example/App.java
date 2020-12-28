@@ -68,8 +68,63 @@ public class App {
                 .subscribe(x -> showNumber("D", x));
 
         Thread.sleep(1000);
-        System.out.println("the end.");
         scheduler.dispose();
+
+        System.out.println("-----");
+        // create
+        Mono number = Mono.create(callback -> {
+            callback.success(321);
+        });
+        number.subscribe(
+                System.out::println,
+                error -> System.err.println("error: " + error),
+                () -> System.out.println("Mono consumed.")
+        );
+
+        // mono creation
+        System.out.println("----- mono creation");
+        number = Mono.create(callback -> {
+            callback.error(new Exception("There is an error"));
+        });
+        number.subscribe(
+                System.out::println,
+                error -> System.out.println("error: " + error),
+                () -> System.out.println("Mono consumed.")
+        );
+
+        System.out.println("-----");
+        number = Mono.create(callback -> {
+            callback.success();
+        });
+        number.subscribe(
+                System.out::println,
+                error -> System.err.println("error: " + error),
+                () -> System.out.println("Mono consumed.")
+        );
+
+        System.out.println("----- mono emitter");
+        MonoEmitter emitter = new MonoEmitter();
+        emitter.getMono().subscribe(
+                System.out::println,
+                error -> System.err.println("error: " + error),
+                () -> System.out.println("Mono consumed.")
+        );
+
+        FluxEmitter fluxEmitter = new FluxEmitter();
+        fluxEmitter.attach().subscribe(
+                System.out::println,
+                error -> System.err.println("error: " + error),
+                () -> System.out.println("fluxEmitter consumed.")
+        );
+
+        fluxEmitter.send(111);
+        fluxEmitter.send(112);
+        fluxEmitter.send(113);
+        fluxEmitter.send(114);
+        fluxEmitter.done();
+        fluxEmitter.send(115);
+
+        Thread.sleep(1500);
     }
 
     private static Integer showNumberAdReturn(String scenario, Integer v) {
