@@ -14,27 +14,136 @@ import java.time.temporal.ChronoUnit;
 public class App {
     public static void main(String[] args) throws InterruptedException {
         System.out.println("reactor-experiment!");
+/*
+        simpleMono();
 
-        // mono
-        Mono<Integer> mono = Mono.just(123);
+        simpleFlux();
 
-        // show on System.out
-        mono.subscribe(System.out::println);
+        usingSchedulers();
 
-        // block and get value
-        System.out.println("first call: " + mono.block());
-        System.out.println("second block call: " + mono.block(Duration.of(1000, ChronoUnit.MILLIS)));
+        monoCreate();
 
-        // flux
-        Flux<Integer> squared = Flux.range(1, 5).map(x -> x * x);
+        monoEmitter();
 
-        // map
-        squared.map(x -> x + " ").subscribe(System.out::print);
-        System.out.println();
+        fluxEmitter();
+*/
 
-        // convert to a mono of integer list
-        squared.collectList().subscribe(System.out::println);
+        errorHandling();
 
+    }
+
+    private static void errorHandling() {
+
+        Flux.just(12, 44, 11, 0, 66, 22)
+                .map(i -> 100 / i)
+                .doOnError(e -> System.out.println("doOnError: " + e.getMessage()))
+                .onErrorResume(e -> {
+                    System.out.println("onErrorResume: " + e.getMessage());
+                    return Flux.just(-1);
+                })
+                .subscribe(
+                        System.out::println,
+                        error -> System.out.println("error: " + error.getMessage())
+                );
+
+        System.out.println("-----");
+
+        Flux.just(12, 44, 11, 0, 66, 22)
+                .map(i -> {
+                    try {
+                        return 100 / i;
+                    } catch (Exception e) {
+                        return Flux.empty();
+                    }
+                })
+                .filter(x -> x != Flux.empty())
+                .doOnError(t -> System.out.println("error: " + t.getMessage()))
+                .onErrorReturn(-1) // error handling example
+                .subscribe(x -> System.out.println("> " + x.toString()));
+
+    }
+
+    private static Flux<Integer> call(Integer i) {
+        return Flux.just(100 / i);
+    }
+
+    private static void fluxEmitter() throws InterruptedException {
+        System.out.println("----- flux emitter");
+        FluxEmitter<Integer> fluxEmitter = new FluxEmitter<>();
+
+        fluxEmitter.attach()
+                .doOnError(e -> System.out.println("error1:" + e.getMessage()))
+                .onErrorResume(Exception.class, __ -> Flux.empty())
+                .doOnNext(i -> System.out.println("1. " + i))
+                .doOnComplete(() -> System.out.println("1. completed"))
+                .subscribe();
+
+        fluxEmitter.attach()
+                //.filter(x -> x % 2 == 0)
+                .doOnError(e -> System.out.println("error2a:" + e.getMessage()))
+                .onErrorResume(Exception.class, __ -> Flux.empty())
+                .subscribe(
+                        i -> System.out.println("2. " + i),
+                        error -> System.out.println("error2b: " + error.getMessage()),
+                        () -> System.out.println("2. completed"));
+
+        fluxEmitter.next(111);
+        fluxEmitter.next(112);
+        fluxEmitter.next(113);
+        fluxEmitter.error(new Exception("This is an error"));
+        fluxEmitter.next(114);
+        fluxEmitter.next(115);
+        fluxEmitter.complete();
+
+        Thread.sleep(1500);
+        System.out.println("The End");
+    }
+
+    private static void monoEmitter() {
+        System.out.println("----- mono emitter");
+        MonoEmitter emitter = new MonoEmitter();
+        emitter.getMono().subscribe(
+                System.out::println,
+                error -> System.err.println("error: " + error),
+                () -> System.out.println("Mono consumed.")
+        );
+    }
+
+    private static void monoCreate() {
+        System.out.println("-----");
+        // create
+        Mono number = Mono.create(callback -> {
+            callback.success(321);
+        });
+        number.subscribe(
+                System.out::println,
+                error -> System.err.println("error: " + error),
+                () -> System.out.println("Mono consumed.")
+        );
+
+        // mono creation
+        System.out.println("----- mono creation");
+        number = Mono.create(callback -> {
+            callback.error(new Exception("There is an error"));
+        });
+        number.subscribe(
+                System.out::println,
+                error -> System.out.println("error: " + error),
+                () -> System.out.println("Mono consumed.")
+        );
+
+        System.out.println("-----");
+        number = Mono.create(callback -> {
+            callback.success();
+        });
+        number.subscribe(
+                System.out::println,
+                error -> System.err.println("error: " + error),
+                () -> System.out.println("Mono consumed.")
+        );
+    }
+
+    private static void usingSchedulers() throws InterruptedException {
         System.out.println("-------- subscribeOn & publishOn");
 
         // subscribeOn & publishOn
@@ -69,76 +178,30 @@ public class App {
 
         Thread.sleep(1000);
         scheduler.dispose();
+    }
 
-        System.out.println("-----");
-        // create
-        Mono number = Mono.create(callback -> {
-            callback.success(321);
-        });
-        number.subscribe(
-                System.out::println,
-                error -> System.err.println("error: " + error),
-                () -> System.out.println("Mono consumed.")
-        );
+    private static void simpleFlux() {
+        // flux
+        Flux<Integer> squared = Flux.range(1, 5).map(x -> x * x);
 
-        // mono creation
-        System.out.println("----- mono creation");
-        number = Mono.create(callback -> {
-            callback.error(new Exception("There is an error"));
-        });
-        number.subscribe(
-                System.out::println,
-                error -> System.out.println("error: " + error),
-                () -> System.out.println("Mono consumed.")
-        );
+        // map
+        squared.map(x -> x + " ").subscribe(System.out::print);
+        System.out.println();
 
-        System.out.println("-----");
-        number = Mono.create(callback -> {
-            callback.success();
-        });
-        number.subscribe(
-                System.out::println,
-                error -> System.err.println("error: " + error),
-                () -> System.out.println("Mono consumed.")
-        );
+        // convert to a mono of integer list
+        squared.collectList().subscribe(System.out::println);
+    }
 
-        System.out.println("----- mono emitter");
-        MonoEmitter emitter = new MonoEmitter();
-        emitter.getMono().subscribe(
-                System.out::println,
-                error -> System.err.println("error: " + error),
-                () -> System.out.println("Mono consumed.")
-        );
+    private static void simpleMono() {
+        // mono
+        Mono<Integer> mono = Mono.just(123);
 
-        System.out.println("----- flux emitter");
-        FluxEmitter<Integer> fluxEmitter = new FluxEmitter<>();
+        // show on System.out
+        mono.subscribe(System.out::println);
 
-        fluxEmitter.attach()
-                .doOnError(e -> System.out.println("error1:" + e.getMessage()))
-                .onErrorResume(Exception.class, __ -> Flux.empty())
-                .doOnNext(i -> System.out.println("1. " + i))
-                .doOnComplete(() -> System.out.println("1. completed"))
-                .subscribe();
-
-        fluxEmitter.attach()
-                //.filter(x -> x % 2 == 0)
-                .doOnError(e -> System.out.println("error2a:" + e.getMessage()))
-                .onErrorResume(Exception.class, __ -> Flux.empty())
-                .subscribe(
-                        i -> System.out.println("2. " + i),
-                        error -> System.out.println("error2b: " + error.getMessage()),
-                        () -> System.out.println("2. completed"));
-
-        fluxEmitter.next(111);
-        fluxEmitter.next(112);
-        fluxEmitter.next(113);
-        fluxEmitter.error(new Exception("This is an error"));
-        fluxEmitter.next(114);
-        fluxEmitter.next(115);
-        fluxEmitter.complete();
-
-        Thread.sleep(1500);
-        System.out.println("The End");
+        // block and get value
+        System.out.println("first call: " + mono.block());
+        System.out.println("second block call: " + mono.block(Duration.of(1000, ChronoUnit.MILLIS)));
     }
 
     private static Integer showNumberAdReturn(String scenario, Integer v) {
