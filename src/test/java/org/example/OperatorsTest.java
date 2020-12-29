@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.test.StepVerifier;
+import reactor.test.scheduler.VirtualTimeScheduler;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 
@@ -99,4 +100,49 @@ public class OperatorsTest {
                 .expectNext(Tuples.of("C", 3))
                 .verifyComplete();
     }
+
+    @Test
+    public void filter() {
+        Flux<Integer> flux = Flux.range(0, 10)
+                .filter(x -> x % 2 == 0);
+
+        StepVerifier.create(flux.log())
+                .expectNext(0, 2, 4, 6, 8)
+                .verifyComplete();
+    }
+
+    @Test
+    public void map() {
+        Flux<Double> flux = Flux.range(1, 5)
+                .map(integer -> (double) (integer * integer));
+
+        StepVerifier.create(flux.log())
+                .expectNext(1.0, 4.0, 9.0, 16.0, 25.0)
+                .verifyComplete();
+    }
+
+    @Test
+    public void cache() {
+        Flux flux = Flux.range(1, 5).delayElements(Duration.ofMillis(500)).cache();
+
+        StepVerifier.create(flux.log())
+                .expectNextCount(5)
+                .verifyComplete();
+
+        StepVerifier.create(flux.log())
+                .expectNextCount(5)
+                .verifyComplete();
+    }
+
+    @Test
+    public void virtualizeTimeExecutionTest() {
+        VirtualTimeScheduler.getOrSet();
+        Flux flux = Flux.range(1, 5).delayElements(Duration.ofMillis(500));
+
+        StepVerifier.withVirtualTime(() -> flux.log())
+                .thenAwait(Duration.ofSeconds(3)) // <-- must be greater than normal test execution time
+                .expectNextCount(5)
+                .verifyComplete();
+    }
+
 }
