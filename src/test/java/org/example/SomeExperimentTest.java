@@ -3,9 +3,12 @@ package org.example;
 import org.junit.Test;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import reactor.test.StepVerifier;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
+
+import java.time.Duration;
 
 public class SomeExperimentTest {
 
@@ -73,5 +76,20 @@ public class SomeExperimentTest {
 
         Thread.sleep(3000);
 
+    }
+
+    @Test
+    public void sequence() {
+
+        Mono<Integer> mono = Mono.just(1).subscribeOn(Schedulers.boundedElastic())
+                .map(x -> x == 1 ? 2 : x)
+                .map(x -> x == 2 ? 3 : x)
+                .delaySubscription(Duration.ofSeconds(1))
+                .map(x -> x == 3 ? 4 : x)
+                .map(x -> x == 4 ? 5 : x);
+
+        StepVerifier.create(mono.log())
+                .expectNext(5)
+                .verifyComplete();
     }
 }
